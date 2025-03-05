@@ -269,7 +269,7 @@
         <ul>
             <li><a href="index.html">Home</a></li>
             <li><a href="news.html">Latest News</a></li>
-           <li><a href="weather.html" >Weather</a></li>
+            <li><a href="#" id="history-link">Reading History</a></li>
         </ul>
     </nav>
 
@@ -329,7 +329,22 @@
             }
         }
 
-       
+        // Toggle history section
+        historyLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (historySection.style.display === 'none') {
+                historySection.style.display = 'block';
+                displayReadingHistory();
+            } else {
+                historySection.style.display = 'none';
+            }
+        });
+
+        // Clear history
+        clearHistoryBtn.addEventListener('click', function() {
+            localStorage.removeItem('readingHistory');
+            displayReadingHistory();
+        });
 
         async function fetchTrendingNews() {
             try {
@@ -355,68 +370,127 @@
                 const card = document.createElement('div');
                 card.className = 'news-card';
                 card.innerHTML = `
-            <img src="${article.image_url || 'https://via.placeholder.com/300x200'}" alt="${article.title}">
-            <div class="news-content">
-                <h3>${article.title}</h3>
-                <p>${article.description?.substring(0, 100) || article.snippet?.substring(0, 100) || ''}...</p>
-                <div class="view-options">
-                    <button class="read-more preview-btn">Quick Preview</button>
-                    <a href="${article.url}" target="_blank" class="read-more read-full-btn">Read Full Article</a>
-                </div>
-            </div>
-        `;
-        
-        // Add click event for the preview button
-        const previewBtn = card.querySelector('.preview-btn');
-        previewBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent card click
-            showArticleModal(article);
-        });
-        
-        // Add click event for the read full article button
-        const readFullBtn = card.querySelector('.read-full-btn');
-        readFullBtn.addEventListener('click', (e) => {
-            saveToReadingHistory(article);
-        });
-        
-        // Add click event for the entire card
-        card.addEventListener('click', () => {
-            showArticleModal(article);
-        });
-        
-        trendingNews.appendChild(card);
-    });
-}
+                    <img src="${article.image_url || 'https://via.placeholder.com/300x200'}" alt="${article.title}">
+                    <div class="news-content">
+                        <h3>${article.title}</h3>
+                        <p>${article.description?.substring(0, 100) || article.snippet?.substring(0, 100) || ''}...</p>
+                        <div class="view-options">
+                            <button class="read-more preview-btn">Quick Preview</button>
+                            <a href="${article.url}" target="_blank" class="read-more read-full-btn">Read Full Article</a>
+                        </div>
+                    </div>
+                `;
+                
+                // Add click event for the preview button
+                const previewBtn = card.querySelector('.preview-btn');
+                previewBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent card click
+                    showArticleModal(article);
+                });
+                
+                // Add click event for the read full article button
+                const readFullBtn = card.querySelector('.read-full-btn');
+                readFullBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent card click
+                    saveToReadingHistory(article);
+                });
+                
+                // Add click event for the entire card
+                card.addEventListener('click', () => {
+                    showArticleModal(article);
+                });
+                
+                trendingNews.appendChild(card);
+            });
+        }
 
-function showArticleModal(article) {
-    modalTitle.textContent = article.title;
-    
-    const publishedDate = new Date(article.published_at).toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
-    
-    modalBody.innerHTML = `
-        <p><strong>Published:</strong> ${publishedDate}</p>
-        <p><strong>Source:</strong> ${article.source}</p>
-        <img src="${article.image_url || 'https://via.placeholder.com/600x400?text=No+Image'}" alt="${article.title}">
-        <p>${article.description || article.snippet || 'No detailed description available.'}</p>
-        <div class="view-options">
-            <a href="${article.url}" target="_blank" class="read-more" id="read-full-btn">
-                Read Full Article
-            </a>
-        </div>
-    `;
-    
-    
-    
-    modal.style.display = "block";
-}
+        function showArticleModal(article) {
+            modalTitle.textContent = article.title;
+            
+            const publishedDate = new Date(article.published_at).toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            modalBody.innerHTML = `
+                <p><strong>Published:</strong> ${publishedDate}</p>
+                <p><strong>Source:</strong> ${article.source}</p>
+                <img src="${article.image_url || 'https://via.placeholder.com/600x400?text=No+Image'}" alt="${article.title}">
+                <p>${article.description || article.snippet || 'No detailed description available.'}</p>
+                <div class="view-options">
+                    <a href="${article.url}" target="_blank" class="read-more" onclick="saveToReadingHistory(${JSON.stringify(article).replace(/"/g, '&quot;')})">
+                        Read Full Article
+                    </a>
+                </div>
+            `;
+            
+            modal.style.display = "block";
+        }
         
-       
-       
+        function saveToReadingHistory(article) {
+            try {
+                let readingHistory = JSON.parse(localStorage.getItem('readingHistory')) || [];
+                
+                // Check if article already exists in history
+                const existingIndex = readingHistory.findIndex(item => item.uuid === article.uuid);
+                
+                // If it exists, remove it so we can add it to the top
+                if (existingIndex !== -1) {
+                    readingHistory.splice(existingIndex, 1);
+                }
+                
+                // Add article with timestamp
+                readingHistory.unshift({
+                    ...article,
+                    read_at: new Date().toISOString()
+                });
+                
+                // Keep only the most recent 50 articles
+                readingHistory = readingHistory.slice(0, 50);
+                
+                localStorage.setItem('readingHistory', JSON.stringify(readingHistory));
+                
+                // Update history display if it's visible
+                if (historySection.style.display !== 'none') {
+                    displayReadingHistory();
+                }
+            } catch (e) {
+                console.error('Error saving to reading history:', e);
+            }
+        }
+
+        function displayReadingHistory() {
+            const historyList = document.getElementById('history-list');
+            historyList.innerHTML = '';
+            
+            const readingHistory = JSON.parse(localStorage.getItem('readingHistory')) || [];
+            
+            if (readingHistory.length === 0) {
+                historyList.innerHTML = '<p>No reading history yet.</p>';
+                return;
+            }
+            
+            readingHistory.forEach(article => {
+                const historyItem = document.createElement('div');
+                historyItem.className = 'history-item';
+                
+                const readDate = new Date(article.read_at).toLocaleDateString();
+                
+                historyItem.innerHTML = `
+                    <h4>${article.title}</h4>
+                    <p>Read on: ${readDate}</p>
+                    <p>Source: ${article.source}</p>
+                `;
+                
+                historyItem.addEventListener('click', () => {
+                    window.open(article.url, '_blank');
+                });
+                
+                historyList.appendChild(historyItem);
+            });
+        }
 
         function searchNews() {
             const searchTerm = document.getElementById('search-input').value;
